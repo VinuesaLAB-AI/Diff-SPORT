@@ -3,7 +3,7 @@ message: "If you use this software, please cite the paper below."
 title: "Diff-SPORT: Diffusion-based sensor placement optimization and reconstruction of turbulent flows in urban environments"
 type: software
 license: MIT
-repository-code: "https://github.com/AbVishwas/Diff-SPORT"
+repository-code: "https://github.com/VinuesaLAB-AI/Diff-SPORT"
 authors:
   - family-names: Vishwasrao
     given-names: Abhijeet
