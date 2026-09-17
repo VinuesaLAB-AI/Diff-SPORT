@@ -4,7 +4,7 @@
 
 Abhijeet Vishwasrao, Sai Bharath Chandra Gutha, Andres Cremades, Klas Wijk, Aakash Patil, H.D. Lim, Christina Vanderwel, Catherine Gorle, Beverley J. McKeon, Hossein Azizpour, Ricardo Vinuesa
 
-Preprint: [arXiv:2506.00214](https://arxiv.org/abs/2506.00214) · Accepted for publication in *Nature Communications* (2026)
+Preprint: [arXiv:2506.00214](https://arxiv.org/abs/2506.00214)
 
 Turbulent urban flows are inherently stochastic and expensive to simulate accurately in real time with traditional methods. Here, the authors report Diff–SPORT, which uses a diffusion-model prior for optimal sensor placement and sparse-sensor flow reconstruction, enabling efficient urban flow monitoring validated on both simulated and experimental urban datasets.
 
