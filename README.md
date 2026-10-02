@@ -89,6 +89,8 @@ All steps go through `run.sh`; `bash run.sh --help` lists the commands and optio
    bash run.sh shap-summary
    ```
 
+The experimental PLIF case follows the same workflow with its own files: `configs/PLIF2D_128x32.py`, `inference_utils/conditional_generation/ddrm-pigdm-mapgd-gen-2D-PLIF.py`, `evaluate_utils/eval-plif2d.py` and `osp_utils/plif/plif2d-shap/`.
+
 The `job_*.sh` scripts next to the Python entry points are the thin wrappers we used on a SLURM cluster; add your own scheduler header to use them.
 
 ## Citation
