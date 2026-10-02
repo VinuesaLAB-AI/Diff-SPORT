@@ -13,6 +13,7 @@ from configs import *
 
 CONFIG_DICT = { 
                     'OneObs2D_ds1_10M': OneObs2D_ds1_10M.config_dict,
+                    'PLIF2D_128x32': PLIF2D_128x32.config_dict,
             }
 
 seed = int(sys.argv[1])

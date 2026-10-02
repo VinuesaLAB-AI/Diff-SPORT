@@ -15,6 +15,7 @@ print("Training started at time:", current_time)
 
 CONFIG_DICT = { 
                     'OneObs2D_ds1_10M': OneObs2D_ds1_10M.config_dict,
+                    'PLIF2D_128x32': PLIF2D_128x32.config_dict,
             }
 
 modelname = sys.argv[1]

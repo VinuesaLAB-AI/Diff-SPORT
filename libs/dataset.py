@@ -3,6 +3,63 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 
+def normalize_distribution(x, alpha=1.0, beta=7.0):
+    """
+    Applies logarithmic normalization with sign preservation for distribution-based data.
+    Used for datasets like PLIF2D where data follows a distribution rather than bounded range.
+
+    Formula: sign(x) * log(1 + |x/alpha|) / beta
+
+    Parameters:
+    x (np.ndarray or torch.Tensor): Input array or tensor with shape (C, H, W) or (num, C, H, W).
+    alpha (float): Scale parameter for log1p normalization (controls compression of large values).
+    beta (float): Division factor to bring normalized values to [-1, 1] range.
+
+    Returns:
+    np.ndarray or torch.Tensor: Normalized array or tensor in range approximately [-1, 1].
+    """
+    is_torch = isinstance(x, torch.Tensor)
+
+    if is_torch:
+        sign_x = torch.sign(x)
+        abs_x = torch.abs(x)
+        normalized = sign_x * torch.log1p(abs_x / alpha) / beta
+    else:
+        sign_x = np.sign(x)
+        abs_x = np.abs(x)
+        normalized = sign_x * np.log1p(abs_x / alpha) / beta
+
+    return normalized
+
+
+def denormalize_distribution(x_norm, alpha=1.0, beta=7.0):
+    """
+    Inverts the logarithmic normalization to recover original distribution-based data.
+
+    Inverse formula: x = alpha * sign(x_norm) * (exp(|x_norm * beta|) - 1)
+
+    Parameters:
+    x_norm (np.ndarray or torch.Tensor): Normalized array or tensor with shape (C, H, W) or (num, C, H, W).
+    alpha (float): Scale parameter used in normalization.
+    beta (float): Division factor used in normalization.
+
+    Returns:
+    np.ndarray or torch.Tensor: Denormalized array or tensor in original range.
+    """
+    is_torch = isinstance(x_norm, torch.Tensor)
+
+    if is_torch:
+        sign_x = torch.sign(x_norm)
+        abs_x = torch.abs(x_norm)
+        denormalized = alpha * sign_x * (torch.exp(abs_x * beta) - 1)
+    else:
+        sign_x = np.sign(x_norm)
+        abs_x = np.abs(x_norm)
+        denormalized = alpha * sign_x * (np.exp(abs_x * beta) - 1)
+
+    return denormalized
+
+
 def read_hdf5(data_file):
     import h5py
     data_arr = h5py.File(data_file, 'r', locking=False)
@@ -154,6 +211,135 @@ class OneObs2D(Dataset):
 
         
 
+class PLIF2D(Dataset):
+    """
+    Dataset class for PLIF2D fluctuation data with logarithmic normalization.
+
+    Data structure:
+        - data: (N, 1, 128, 32) - pre-combined single-channel fluctuation field
+        - mask: (128, 32) - boolean mask for valid regions
+        - x_coords: (128,) - spatial x coordinates
+        - y_coords: (32,) - spatial y coordinates
+        - offset_patterns: (N, 2) - offset information per sample
+        - original_file_indices: (N,) - source file tracking
+    """
+
+    def __init__(self, data_file=None, filetype="hdf5", transform=None,
+                 ds_ratio=1, normalize=True, image_size=None,
+                 alpha=1.0, beta=7.0):
+        """
+        Args:
+            data_file: Path to HDF5 file
+            filetype: File format (only 'hdf5' supported)
+            transform: Optional transform to apply
+            ds_ratio: Downsampling ratio (should be 1, data already at target resolution)
+            normalize: Whether to apply log1p normalization
+            image_size: Expected image size tuple (H, W)
+            alpha: Scale parameter for log1p normalization (controls compression)
+            beta: Division factor to bring normalized values to [-1, 1] range
+        """
+        assert data_file is not None
+        assert filetype == "hdf5", "Only HDF5 format supported"
+
+        self.normalize = normalize
+        self.transform = transform
+        self.alpha = alpha
+        self.beta = beta
+
+        if filetype == "hdf5":
+            # ============================================================
+            # 1. Load data from HDF5
+            # ============================================================
+            data_arr = read_hdf5(data_file)
+
+            # Load main data field (already in N, C, H, W format)
+            data = np.asarray(data_arr["data"][:], dtype=np.float32)  # (N, 1, 128, 32)
+
+            # Load coordinates
+            x_coords = np.asarray(data_arr["x_coords"][:])  # (128,)
+            y_coords = np.asarray(data_arr["y_coords"][:])  # (32,)
+
+            # Load mask (optional usage)
+            mask = np.asarray(data_arr["mask"][:]).astype(bool)  # (128, 32)
+
+            # Load metadata (for tracking)
+            offset_patterns = np.asarray(data_arr["offset_patterns"][:])  # (N, 2)
+            original_indices = np.asarray(data_arr["original_file_indices"][:])  # (N,)
+
+            # ============================================================
+            # 2. Validate shapes
+            # ============================================================
+            N, C, H, W = data.shape
+            assert (H, W) == image_size, f"Data shape {(H, W)} != expected {image_size}"
+            assert C == 1, f"Expected single channel, got {C}"
+            assert x_coords.shape == (H,), f"x_coords shape mismatch"
+            assert y_coords.shape == (W,), f"y_coords shape mismatch"
+            assert mask.shape == (H, W), f"mask shape mismatch"
+
+            # ============================================================
+            # 3. Handle downsampling (if needed, though ds_ratio should be 1)
+            # ============================================================
+            if ds_ratio != 1:
+                # Apply downsampling if requested
+                data = data[:, :, ::ds_ratio, ::ds_ratio]
+                x_coords = x_coords[::ds_ratio]
+                y_coords = y_coords[::ds_ratio]
+                mask = mask[::ds_ratio, ::ds_ratio]
+
+                # Update dimensions
+                H, W = H // ds_ratio, W // ds_ratio
+                assert (H, W) == image_size, f"Downsampled shape {(H, W)} != expected {image_size}"
+
+            # ============================================================
+            # 4. Store attributes
+            # ============================================================
+            self.data = data  # (N, 1, H, W)
+            self.x = x_coords
+            self.y = y_coords
+            self.mask = mask
+            self.offset_patterns = offset_patterns
+            self.original_indices = original_indices
+
+            # Verify final shape and dtype
+            assert self.data.shape == (N, 1, H, W), f"Final data shape mismatch"
+            assert self.data.dtype == np.float32, f"Data dtype should be float32"
+
+        else:
+            raise NotImplementedError(f"Filetype {filetype} not supported")
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        """
+        Returns normalized fluctuation field for given index.
+
+        Returns:
+            image: (1, H, W) normalized fluctuation field in range [-1, 1]
+        """
+        image = self.data[idx]  # (1, H, W)
+
+        if self.normalize:
+            image = self.__normalize(image)
+
+        if self.transform is not None:
+            image = self.transform(image)
+
+        return image
+
+    def __normalize(self, fluctuation):
+        """
+        Apply logarithmic normalization with sign preservation using centralized function.
+
+        Args:
+            fluctuation: (1, H, W) raw fluctuation field
+
+        Returns:
+            normalized: (1, H, W) normalized field in range [-1, 1]
+        """
+        return normalize_distribution(fluctuation, alpha=self.alpha, beta=self.beta)
+
+
 class OneObs3D(Dataset):
     
     def __init__(self, data_root=None, data_file=None, filetype="hdf5", transform=None, ds_ratio=1):
@@ -228,6 +414,17 @@ def get_dataset(config):
         return OneObs2D(data_file = config.dataset.data_file, filetype = config.dataset.filetype.lower(), 
                         transform = get_transform(config.dataset.transform), ds_ratio = config.dataset.ds_ratio,
                         normalize = config.dataset.normalize, image_size = config.model.image_size)
+
+    elif config.dataset.name.lower() == "plif2d":
+
+        return PLIF2D(data_file = config.dataset.data_file,
+                      filetype = config.dataset.filetype.lower(),
+                      transform = get_transform(config.dataset.transform),
+                      ds_ratio = config.dataset.ds_ratio,
+                      normalize = config.dataset.normalize,
+                      image_size = config.model.image_size,
+                      alpha = getattr(config.dataset, "alpha", 1.0),
+                      beta = getattr(config.dataset, "beta", 7.0))
 
     elif config.dataset.name.lower() == "oneobs3d":
         
