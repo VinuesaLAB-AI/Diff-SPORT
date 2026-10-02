@@ -230,3 +230,4 @@ osp_utils/shap/logs/
 # Evaluation outputs are not tracked
 evaluate_utils/results/
 osp_utils/evaluate_best/results/
+osp_utils/plif/plif2d-shap/results/
