@@ -49,10 +49,7 @@ The `Dockerfile` builds an equivalent environment. The SHAP dependency is vendor
 
 ## Data
 
-- **DNS dataset** (flow around a wall-mounted square cylinder): available on Zenodo at <https://doi.org/10.5281/zenodo.22737509>.
-- **Experimental PLIF dataset** of the LT2400 urban canopy (Lim et al., *Exp. Fluids* 63, 92, 2022): available from the University of Southampton repository at <https://doi.org/10.5258/SOTON/D2217>.
-
-The training/test split is defined by the `data_file` and `test_data_file` entries in `configs/`; point them at your own HDF5 files to use a different split or dataset.
+The DNS dataset (flow around a wall-mounted square cylinder) and the experimental PLIF dataset of the LT2400 urban canopy (Lim et al., *Exp. Fluids* 63, 92, 2022) are both available on Zenodo at <https://doi.org/10.5281/zenodo.22737509>.
 
 ## Reproducing the workflow
 
